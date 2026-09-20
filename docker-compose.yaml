@@ -1,18 +1,24 @@
 services:
-  promtail-vlogs-mongodb:
-    image: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
-    container_name: promtail-vlogs-mongodb
+  alloy-vlogs-mongodb:
+    image: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-amd64:1.0.0
+    container_name: alloy-vlogs-mongodb
     restart: always
-    network_mode: host
     environment:
-      PROMTAIL_PUSH_URL: http://172.17.30.241:9428/insert/loki/api/v1/push
-      PROMTAIL_USERNAME: myuser
-      PROMTAIL_PASSWORD: mypassword
-      PROMTAIL_JOB_NAME: mongodb-01
-      PROMTAIL_LOG_PATH: /data/logs/mongodb/mongodb.log
+      # victorialogs 服务地址，需根据实际情况修改
+      VICTORIALOGS_IP: 10.206.0.5
+      # victorialogs 认证用户，需根据实际情况修改
+      VICTORIALOGS_USERNAME: myuser
+      # victorialogs 认证密码，需根据实际情况修改
+      VICTORIALOGS_PASSWORD: mypassword
+      # victorialogs 服务端口，默认 9428
+      VICTORIALOGS_PORT: 9428
+      # MongoDB 所在服务器 IP，用于生成 mongodb-<IP> 唯一标识
+      MONGODB_SERVER_IP: 10.206.0.8
     volumes:
-      - /home/data/logs/mongodb/mongodb.log:/data/logs/mongodb/mongodb.log:ro
-      - ./promtail-data:/data/promtail
+      - /data/logs/mongodb/mongodb.log:/data/logs/mongodb/mongodb.log:ro
+      - /etc/hostname:/host/etc/hostname:ro
+      - /etc/machine-id:/host/etc/machine-id:ro
+      - /data/alloy-data:/usr/local/alloy-vlogs/data
     deploy:
       resources:
         limits:

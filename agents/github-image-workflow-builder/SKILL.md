@@ -54,8 +54,8 @@ Git push 与手动运行要区分：push 不接收 `workflow_dispatch` 的 `oper
 14. Artifact 名称按镜像最后一段和 Release tag 生成；Release tag 入参可省略，未配置时使用 `latest`，例如：
 
    ```text
-   hap-promtail-vlogs-mongodb-amd64:1.0.0
-   -> hap-promtail-vlogs-mongodb-amd64_1.0.0.tar.gz
+   hap-alloy-vlogs-mongodb-amd64:1.0.0
+   -> hap-alloy-vlogs-mongodb-amd64_1.0.0.tar.gz
    ```
 15. Actions UI 步骤保持精简：推荐每个构建 Job 只保留 checkout、一个包含登录/Builder/Build/Push/Save 的构建步骤和 Artifact 上传；不要为每个正常动作拆出大量可视步骤。失败原因写入日志和 Summary 即可。
 16. Alpine 源和版本应可配置：使用 `ALPINE_MIRROR`、`ALPINE_VERSION`，不要把源地址散落在多个文件中；删除 `apk update` 与 `apk add --no-cache` 的重复索引刷新。

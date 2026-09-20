@@ -30,7 +30,7 @@ set -e
 
 REGISTRY="registry.cn-hangzhou.aliyuncs.com/hap-mdy"
 
-IMAGE_BASE_NAME="hap-promtail-vlogs-mongodb"
+IMAGE_BASE_NAME="hap-alloy-vlogs-mongodb"
 
 IMAGE_TAG="1.0.0"
 

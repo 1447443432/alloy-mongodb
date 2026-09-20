@@ -1,0 +1,98 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+local.file_match "mongodb" {
+  path_targets = [
+    {
+      __path__ = sys.env("MONGODB_LOG_PATH")
+      job      = sys.env("MONGODB_JOB_NAME")
+      host     = sys.env("MONGODB_HOSTNAME")
+      instance = sys.env("MONGODB_HOSTNAME")
+    },
+  ]
+}
+
+loki.source.file "mongodb" {
+  targets    = local.file_match.mongodb.targets
+  forward_to = [loki.process.mongodb.receiver]
+}
+
+loki.process "mongodb" {
+  // Parse MongoDB JSON logs and use the embedded timestamp.
+  stage.json {
+    expressions = {
+      ts   = "t.\"$date\""
+      c    = "c"
+      msg  = "msg"
+      attr = "attr"
+    }
+    drop_malformed = true
+  }
+
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339"
+  }
+
+  // Keep only MongoDB slow-query records.
+  stage.labels {
+    values = {
+      c   = ""
+      msg = ""
+    }
+  }
+
+  stage.match {
+    selector = "{c!=\"COMMAND\"}"
+    action   = "drop"
+  }
+
+  stage.match {
+    selector = "{msg!=\"Slow query\"}"
+    action   = "drop"
+  }
+
+  // Keep query details in the log JSON. Do not promote them to labels:
+  // duration, namespace, plan and attr are high-cardinality fields.
+  stage.json {
+    source = "attr"
+    expressions = {
+      durationMillis = "durationMillis"
+      ns             = "ns"
+      planSummary    = "planSummary"
+      docsExamined   = "docsExamined"
+      reslen         = "reslen"
+    }
+  }
+
+  stage.template {
+    source = "line"
+    template = `- {
+  "ns": "{{ .ns }}",
+  "durationMillis": "{{ .durationMillis }}",
+  "planSummary": "{{ .planSummary }}",
+  "docsExamined": "{{ .docsExamined }}",
+  "reslen": "{{ .reslen }}",
+  "attr": "{{ .attr }}"
+}`
+  }
+
+  stage.output {
+    source = "line"
+  }
+
+  forward_to = [loki.write.victorialogs.receiver]
+}
+
+loki.write "victorialogs" {
+  endpoint {
+    url = sys.env("VICTORIALOGS_PUSH_URL")
+
+    basic_auth {
+      username = sys.env("VICTORIALOGS_USERNAME")
+      password = sys.env("VICTORIALOGS_PASSWORD")
+    }
+  }
+}
