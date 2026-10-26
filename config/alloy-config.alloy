@@ -20,6 +20,8 @@ loki.source.file "mongodb" {
 }
 
 loki.process "mongodb" {
+  forward_to = [loki.write.victorialogs.receiver]
+
   // Parse MongoDB JSON logs and use the embedded timestamp.
   stage.json {
     expressions = {
@@ -113,13 +115,14 @@ loki.process "mongodb" {
   stage.output {
     source = "vl_line"
   }
-
-  forward_to = [loki.write.victorialogs.receiver]
 }
 
 loki.write "victorialogs" {
   endpoint {
     url = sys.env("VICTORIALOGS_PUSH_URL")
+
+    batch_wait = "1s"
+    batch_size = "100KiB"
 
     basic_auth {
       username = sys.env("MONITOR_AUTH_USERNAME")
