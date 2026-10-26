@@ -98,11 +98,11 @@ docker push 阿里云镜像
 
 ## Workflow 运行记录清理
 
-每次 Workflow 完整成功后，末尾的 `cleanup-successful-runs` Job 会通过 GitHub API 清理该 Workflow 较早的成功运行记录，只保留最近一次成功运行。失败、取消、排队中和正在运行的记录不会删除，便于保留故障排查信息。
+每次 Workflow 完整成功后，末尾的 `cleanup-successful-runs` Job 会通过 GitHub API 清理该 Workflow 其他已完成的运行记录（包括成功、失败和取消），只保留当前这次最新成功运行。当前运行、排队中和正在运行的记录不会删除。
 
 该清理只处理 Actions 运行记录，不会删除 GitHub Release 或 Release 附件。如果需要清理历史 Release，需要单独执行 Release 清理策略。
 
-清理 Job 需要 `actions: write` 权限，并且仅在当前构建、打包和 Release 流程成功（或对应模块被正常跳过）时执行；构建失败或通知失败时不会触发清理。
+清理 Job 需要 `actions: write` 权限，并且仅在当前构建、打包和 Release 流程成功（或对应模块被正常跳过）时执行；构建失败或通知失败时不会触发清理。清理 API 失败不会回滚已经成功的构建或 Release，需根据 Job 日志重新处理未删除的运行记录。
 
 ## Workflow 运行模式
 

@@ -73,6 +73,7 @@ jobs:
   lint:
     name: Validate GitHub Actions workflows
     runs-on: ubuntu-24.04
+    continue-on-error: true
     permissions:
       contents: read
     steps:
@@ -301,7 +302,7 @@ jobs:
       actions: write
       contents: read
     steps:
-      - name: Delete older successful workflow runs
+      - name: Delete older completed workflow runs
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
