@@ -102,7 +102,7 @@ docker push 阿里云镜像
 
 该清理只处理 Actions 运行记录，不会删除 GitHub Release 或 Release 附件。如果需要清理历史 Release，需要单独执行 Release 清理策略。
 
-清理 Job 需要 `actions: write` 权限，并且仅在当前构建、打包和 Release 流程成功（或对应模块被正常跳过）时执行；构建失败或通知失败时不会触发清理。清理 API 失败不会回滚已经成功的构建或 Release，需根据 Job 日志重新处理未删除的运行记录。
+清理 Job 需要 `actions: write` 权限，并且仅在当前构建、打包和 Release 流程成功（或对应模块被正常跳过）时执行；构建失败或通知失败时不会触发清理。清理 Job 使用 `continue-on-error: true`，清理 API 失败不会回滚已经成功的构建或 Release，需根据 Job 日志重新处理未删除的运行记录。
 
 ## Workflow 运行模式
 
