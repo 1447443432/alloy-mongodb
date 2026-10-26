@@ -6,10 +6,9 @@ services:
     environment:
       # victorialogs 服务地址，需根据实际情况修改
       VICTORIALOGS_IP: 10.206.0.5
-      # victorialogs 认证用户，需根据实际情况修改
-      VICTORIALOGS_USERNAME: myuser
-      # victorialogs 认证密码，需根据实际情况修改
-      VICTORIALOGS_PASSWORD: mypassword
+      # 与 hap-monitor-logs 共用 VictoriaLogs Basic Auth，需与其保持一致
+      MONITOR_AUTH_USERNAME: myuser
+      MONITOR_AUTH_PASSWORD: mypassword
       # victorialogs 服务端口，默认 9428
       VICTORIALOGS_PORT: 9428
       # MongoDB 所在服务器 IP，用于生成 mongodb-<IP> 唯一标识

@@ -10,20 +10,24 @@ ALLOY_BIN="${ALLOY_HOME}/bin/alloy"
 
 : "${VICTORIALOGS_IP:=}"
 : "${VICTORIALOGS_PORT:=9428}"
-: "${VICTORIALOGS_USERNAME:=}"
-: "${VICTORIALOGS_PASSWORD:=}"
+# MONITOR_AUTH_* is the shared VictoriaLogs/Grafana authentication name.
+# Keep VICTORIALOGS_* as a backward-compatible fallback for older deployments.
+: "${MONITOR_AUTH_USERNAME:=${VICTORIALOGS_USERNAME:-}}"
+: "${MONITOR_AUTH_PASSWORD:=${VICTORIALOGS_PASSWORD:-}}"
+VICTORIALOGS_USERNAME="${MONITOR_AUTH_USERNAME}"
+VICTORIALOGS_PASSWORD="${MONITOR_AUTH_PASSWORD}"
 : "${MONGODB_LOG_PATH:=/data/logs/mongodb/mongodb.log}"
 
 if [ -z "${VICTORIALOGS_IP}" ]; then
   echo ">>> ERROR: VICTORIALOGS_IP is required" >&2
   exit 1
 fi
-if [ -z "${VICTORIALOGS_USERNAME}" ]; then
-  echo ">>> ERROR: VICTORIALOGS_USERNAME is required" >&2
+if [ -z "${MONITOR_AUTH_USERNAME}" ]; then
+  echo ">>> ERROR: MONITOR_AUTH_USERNAME is required" >&2
   exit 1
 fi
-if [ -z "${VICTORIALOGS_PASSWORD}" ]; then
-  echo ">>> ERROR: VICTORIALOGS_PASSWORD is required" >&2
+if [ -z "${MONITOR_AUTH_PASSWORD}" ]; then
+  echo ">>> ERROR: MONITOR_AUTH_PASSWORD is required" >&2
   exit 1
 fi
 
@@ -56,7 +60,8 @@ fi
 
 VICTORIALOGS_PUSH_URL="http://${VICTORIALOGS_IP}:${VICTORIALOGS_PORT}/insert/loki/api/v1/push?preserve_json_keys=attr&_stream_fields=job,host,instance"
 
-export VICTORIALOGS_PUSH_URL VICTORIALOGS_USERNAME VICTORIALOGS_PASSWORD
+export VICTORIALOGS_PUSH_URL MONITOR_AUTH_USERNAME MONITOR_AUTH_PASSWORD
+export VICTORIALOGS_USERNAME VICTORIALOGS_PASSWORD
 export MONGODB_LOG_PATH MONGODB_SERVER_IP MONGODB_INSTANCE_ID MONGODB_JOB_NAME MONGODB_HOSTNAME
 
 echo ">>> Alloy binary: ${ALLOY_BIN}"
