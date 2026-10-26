@@ -33,12 +33,19 @@ fi
 echo "========== docker build =========="
 echo "[INFO] docker build running..."
 build_log="build-${ARCHITECTURE}.log"
+cache_args=()
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  cache_args+=(
+    --cache-from "type=gha,scope=alloy-${ARCHITECTURE}"
+    --cache-to "type=gha,mode=max,scope=alloy-${ARCHITECTURE}"
+  )
+  echo "[INFO] GitHub Actions build cache enabled: alloy-${ARCHITECTURE}"
+fi
 if ! docker buildx build --builder "$builder" \
   --platform "$PLATFORM" \
   --build-arg TARGETARCH="$ARCHITECTURE" \
   --build-arg BASE_IMAGE="$BASE_IMAGE" \
-  --build-arg ALPINE_MIRROR="$ALPINE_MIRROR" \
-  --build-arg ALPINE_VERSION="$ALPINE_VERSION" \
+  "${cache_args[@]}" \
   --file "$DOCKERFILE" \
   --tag "$TARGET_IMAGE" \
   --load "$BUILD_CONTEXT" >"$build_log" 2>&1; then
@@ -70,7 +77,7 @@ if [[ "$RELEASE_ENABLED" == true ]]; then
   echo "[INFO] saving local image..."
   mkdir -p release-assets
   archive="release-assets/${image_name}_${RELEASE_TAG}.tar.gz"
-  docker save "$TARGET_IMAGE" | gzip -9 > "$archive"
+  docker save "$TARGET_IMAGE" | gzip -6 > "$archive"
   sha256sum "$archive" > "$archive.sha256"
   echo "[OK] image package: $archive"
 fi

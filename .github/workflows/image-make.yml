@@ -105,8 +105,6 @@ jobs:
       hap_enabled: ${{ steps.check.outputs.hap_enabled }}
       dockerfile: ${{ steps.check.outputs.dockerfile }}
       build_context: ${{ steps.check.outputs.build_context }}
-      alpine_mirror: ${{ steps.check.outputs.alpine_mirror }}
-      alpine_version: ${{ steps.check.outputs.alpine_version }}
       base_image_amd64: ${{ steps.check.outputs.base_image_amd64 }}
       base_image_arm64: ${{ steps.check.outputs.base_image_arm64 }}
       can_primary: ${{ steps.check.outputs.can_primary }}
@@ -157,6 +155,7 @@ jobs:
         architecture: ${{ fromJSON(needs.config.outputs.architectures) }}
     runs-on: ${{ matrix.architecture == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     permissions:
+      actions: write
       contents: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -179,8 +178,6 @@ jobs:
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
           DOCKERFILE: ${{ needs.config.outputs.dockerfile }}
           BUILD_CONTEXT: ${{ needs.config.outputs.build_context }}
-          ALPINE_MIRROR: ${{ needs.config.outputs.alpine_mirror }}
-          ALPINE_VERSION: ${{ needs.config.outputs.alpine_version }}
         run: bash .github/image-make/build.sh
       - name: Upload locally built image package
         if: ${{ needs.config.outputs.release_enabled == 'true' }}
@@ -278,3 +275,66 @@ jobs:
             echo "[ERROR] HAP Webhook failed"
             exit 1
           fi
+
+  cleanup-successful-runs:
+    needs: [config, build, package, release]
+    name: Keep latest successful workflow run
+    if: >-
+      ${{
+        always() &&
+        needs.config.result == 'success' &&
+        (
+          (needs.config.outputs.operation == 'pull-release' && needs.build.result == 'skipped') ||
+          (needs.config.outputs.operation != 'pull-release' && needs.build.result == 'success')
+        ) &&
+        (
+          (needs.config.outputs.can_package == 'true' && needs.package.result == 'success') ||
+          (needs.config.outputs.can_package != 'true' && needs.package.result == 'skipped')
+        ) &&
+        (
+          (needs.config.outputs.can_release == 'true' && needs.release.result == 'success') ||
+          (needs.config.outputs.can_release != 'true' && needs.release.result == 'skipped')
+        )
+      }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete older successful workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+
+          workflow_file="${WORKFLOW_REF#*/.github/workflows/}"
+          workflow_file="${workflow_file%@*}"
+          endpoint="repos/${REPOSITORY}/actions/workflows/${workflow_file}/runs?status=completed&per_page=100"
+
+          echo "[INFO] finding successful runs for ${workflow_file}..."
+          successful_runs="$(gh api --paginate --slurp "${endpoint}" --jq '
+            [.[].workflow_runs[]
+              | select(.status == "completed" and .conclusion == "success")
+            ]
+            | sort_by(.created_at)
+            | reverse
+            | .[1:]
+            | .[]
+            | [.id, .run_number, .created_at]
+            | @tsv
+          ')"
+
+          if [[ -z "${successful_runs}" ]]; then
+            echo "[OK] no older successful runs to delete"
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r run_id run_number created_at; do
+            [[ -z "${run_id}" ]] && continue
+            echo "[INFO] deleting successful run #${run_number} (${run_id}, ${created_at})"
+            gh api --method DELETE "repos/${REPOSITORY}/actions/runs/${run_id}"
+          done <<< "${successful_runs}"
+
+          echo "[OK] kept the latest successful workflow run"

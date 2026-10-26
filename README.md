@@ -96,7 +96,23 @@ docker push 阿里云镜像
 
 没有配置阿里云地址或账号密码时，`build-release` 仍然使用主镜像构建和发布；手动选择 `build-push-release` 时会直接跳过构建、打包和发布，并在 Actions Summary 中列出缺失配置。`pull-release` 只在阿里云地址、账号密码和镜像地址完整时执行。配置完整后，Push 或 Pull 产生的 Release 清单会记录实际使用的阿里云镜像地址。
 
+## Workflow 运行记录清理
+
+每次 Workflow 完整成功后，末尾的 `cleanup-successful-runs` Job 会通过 GitHub API 清理该 Workflow 较早的成功运行记录，只保留最近一次成功运行。失败、取消、排队中和正在运行的记录不会删除，便于保留故障排查信息。
+
+该清理只处理 Actions 运行记录，不会删除 GitHub Release 或 Release 附件。如果需要清理历史 Release，需要单独执行 Release 清理策略。
+
+清理 Job 需要 `actions: write` 权限，并且仅在当前构建、打包和 Release 流程成功（或对应模块被正常跳过）时执行；构建失败或通知失败时不会触发清理。
+
 ## Workflow 运行模式
+
+### 构建速度与镜像体积
+
+amd64 和 arm64 使用各自的原生 Runner 分别构建，不使用 QEMU 模拟。当前构建脚本已按架构启用 GitHub Actions Buildx 缓存，第一次构建仍需要拉取基础镜像，后续同架构构建会复用缓存。
+
+官方 `grafana/alloy` 目前没有 Alpine 变体。当前使用完整的官方 `grafana/alloy:v1.21.2` 基础镜像，保留完整发行版运行环境，便于现有 entrypoint 读取宿主机 `machine-id`、生成唯一任务名和处理默认参数。Dockerfile 使用软链接引用 Alloy 程序，避免再次复制一份大二进制。
+
+当前镜像包使用 `docker save | gzip` 打包，服务器上 `docker images` 显示的是解压后的层大小，通常会明显大于压缩后的镜像传输体积。
 
 使用 `Actions → Image Make → Run workflow` 时，`operation` 请选择以下模式之一：
 
@@ -131,7 +147,7 @@ BASE_IMAGE_AMD64=registry.example.com/base/linux-amd64:3.23
 BASE_IMAGE_ARM64=another.example.com/base/arm64-runtime:3.23
 ```
 
-Workflow 会把对应值通过 `--build-arg BASE_IMAGE=...` 传给 Dockerfile。默认使用官方多架构 `grafana/alloy:latest`，直接手动构建会按当前 Docker 平台自动选择 amd64 或 arm64：
+Workflow 会把对应值通过 `--build-arg BASE_IMAGE=...` 传给 Dockerfile。当前固定使用官方多架构 `grafana/alloy:v1.21.2`，直接手动构建会按当前 Docker 平台自动选择 amd64 或 arm64：
 
 ```bash
 docker build -t alloy-mongodb:amd64 .
@@ -187,7 +203,7 @@ amd64 和 arm64 附件字段始终存在；如果某架构没有产物，对应�
 
 ## 手动 Docker 构建
 
-Dockerfile 兼容直接手动构建，默认使用官方多架构 `grafana/alloy:latest`：
+Dockerfile 兼容直接手动构建，默认使用官方多架构 `grafana/alloy:v1.21.2`：
 
 ```bash
 docker build -t alloy-mongodb:amd64 .
@@ -241,8 +257,8 @@ IMAGE_TAG=1.0.0
 ARCHITECTURES=all
 PUSH_OPERATION=auto
 RELEASE_NAME=hap-alloy-vlogs-mongodb
-BASE_IMAGE_AMD64=grafana/alloy:latest
-BASE_IMAGE_ARM64=grafana/alloy:latest
+BASE_IMAGE_AMD64=grafana/alloy:v1.21.2
+BASE_IMAGE_ARM64=grafana/alloy:v1.21.2
 TARGET_IMAGE_AMD64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-amd64:1.0.0
 TARGET_IMAGE_ARM64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-arm64:1.0.0
 ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
@@ -258,7 +274,7 @@ ENABLE_HAP_WEBHOOK=true
 - `BASE_REGISTRY_USERNAME`、`BASE_REGISTRY_PASSWORD`：没有默认值；只有基础镜像仓库为私有仓库时才需要。
 - `TARGET_IMAGE_AMD64`、`TARGET_IMAGE_ARM64`：通用 Workflow 没有默认镜像地址；当前项目的默认值来自 `.image-build.env`，地址按原样使用。复制到其他项目时必须替换成新项目的镜像地址。
 
-Dockerfile 的 `BASE_IMAGE` 默认值 `grafana/alloy:latest` 只保证手动 `docker build .` 可用；CI 配置仍要求 `BASE_IMAGE_AMD64` 和 `BASE_IMAGE_ARM64` 都能解析到有效值，以避免架构基础镜像配置不明确。
+Dockerfile 的 `BASE_IMAGE` 默认值固定为 `grafana/alloy:v1.21.2`；CI 配置仍要求 `BASE_IMAGE_AMD64` 和 `BASE_IMAGE_ARM64` 都能解析到有效值，以避免架构基础镜像配置不明确。
 
 ## GitHub Actions 配置方法
 
@@ -288,8 +304,8 @@ Variables 用于在 GitHub 侧覆盖非敏感配置，不是全部必填。在 `
 | `RELEASE_NAME` | `alloy-mongodb` | Release 名和 HAP `project_name`；不配置时使用仓库名 |
 | `TARGET_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | amd64 主镜像地址，按原样使用 |
 | `TARGET_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | arm64 主镜像地址，按原样使用 |
-| `BASE_IMAGE_AMD64` | `grafana/alloy:latest` | amd64 Alloy 基础镜像 |
-| `BASE_IMAGE_ARM64` | `grafana/alloy:latest` | arm64 Alloy 基础镜像 |
+| `BASE_IMAGE_AMD64` | `grafana/alloy:v1.21.2` | amd64 Alloy 基础镜像 |
+| `BASE_IMAGE_ARM64` | `grafana/alloy:v1.21.2` | arm64 Alloy 基础镜像 |
 | `ALIYUN_REGISTRY` | `registry.cn-hangzhou.aliyuncs.com` | 阿里云 Registry 地址 |
 | `ALIYUN_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | 阿里云 amd64 镜像地址，按原样使用 |
 | `ALIYUN_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | 阿里云 arm64 镜像地址，按原样使用 |
@@ -346,9 +362,33 @@ Webhook URL 为空、`ENABLE_HAP_WEBHOOK` 不是 `true`，或 Release 没有成�
 
 ### 阿里云 Push 配置示例
 
+阿里云 ACR 镜像地址必须同时满足以下格式：
+
+```text
+<registry>/<namespace>/<repository>:<tag>
+```
+
+本项目默认使用以下命名，amd64 和 arm64 必须是两个不同的仓库名或至少是两个不同的镜像名：
+
+```text
+registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-amd64:1.0.0
+registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-arm64:1.0.0
+```
+
+其中：
+
+- `registry.cn-hangzhou.aliyuncs.com` 是 ACR Registry 地址，必须与 `ALIYUN_REGISTRY` 完全一致；
+- `hap-mdy` 是 ACR 命名空间，必须是当前账号有 Push 权限的命名空间；
+- `hap-alloy-vlogs-mongodb-amd64` 和 `hap-alloy-vlogs-mongodb-arm64` 是两个架构对应的镜像名称；
+- `1.0.0` 是镜像 Tag，同时也是默认 Release Tag。
+
+如果改用其他地域或命名空间，必须同时修改 `ALIYUN_REGISTRY`、`ALIYUN_IMAGE_AMD64` 和 `ALIYUN_IMAGE_ARM64`，不能只修改 Registry 登录地址。Workflow 会在配置检查阶段校验两个 Aliyun 镜像地址的 Registry 是否一致，并校验路径中是否包含 `namespace/repository`；校验失败时不会进入构建和 Push。
+
 ```text
 Repository Variables:
   ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
+  ALIYUN_IMAGE_AMD64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-amd64:1.0.0
+  ALIYUN_IMAGE_ARM64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-alloy-vlogs-mongodb-arm64:1.0.0
   ENABLE_ALIYUN_PUSH=true
 
 Repository Secrets:
@@ -398,4 +438,4 @@ Workflow 使用固定的 Action commit 和 actionlint 镜像 digest，升级依�
 
 `RELEASE_NAME` 写入 Release manifest。压缩包名称会根据镜像最后一段和 tag 自动生成，例如 `hap-alloy-vlogs-mongodb-amd64_1.0.0.tar.gz`。构建上下文配置项使用 `BUILD_CONTEXT`，不要命名为 Docker 保留的 `DOCKER_CONTEXT`。复制这套 Workflow 到其他项目时，只需要修改 `.image-build.env`、Dockerfile 和必要的镜像配置，不需要把 CI 脚本混入项目业务 `scripts/`。
 
-当前镜像直接使用 Grafana Alloy 官方多架构基础镜像，不再需要在 Dockerfile 中安装 Alpine 软件包；`ALPINE_MIRROR` 和 `ALPINE_VERSION` 仅为通用 Workflow 保留，不参与本项目镜像构建。
+当前镜像使用 Grafana Alloy 官方完整多架构基础镜像；项目已移除无效的 `ALPINE_MIRROR` 和 `ALPINE_VERSION` 构建参数。

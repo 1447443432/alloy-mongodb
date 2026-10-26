@@ -76,46 +76,29 @@ usage() {
 while [[ $# -gt 0 ]]; do
 
     case "$1" in
-
         -a|--arch)
-
             ARCH="$2"
-
             shift
             ;;
-
         -c|--clean)
-
             CLEAN=true
             ;;
-
         -n|--no-cache)
-
             NO_CACHE=true
             ;;
-
         -cn|-nc)
-
             CLEAN=true
             NO_CACHE=true
             ;;
-
         -h|--help)
-
             usage
             ;;
-
         *)
-
             echo ">>> 未知参数: $1"
-
             echo
-
             usage
             ;;
-
     esac
-
     shift
 
 done
@@ -125,21 +108,13 @@ done
 ###############################################################################
 
 case "${ARCH}" in
-
     amd64|arm64)
-
         ;;
-
     *)
-
         echo ">>> 不支持的架构: ${ARCH}"
-
         echo ">>> 仅支持: amd64, arm64"
-
         exit 1
-
         ;;
-
 esac
 
 ###############################################################################

@@ -38,6 +38,25 @@ def image_name(reference):
     return name.rsplit(":", 1)[0]
 
 
+def image_registry(reference):
+    """Return the registry host, or an empty string for a local image name."""
+    parts = reference.split("/", 1)
+    if len(parts) == 1:
+        return ""
+    host = parts[0]
+    if "." in host or ":" in host or host == "localhost":
+        return host
+    return ""
+
+
+def image_repository(reference):
+    """Return the repository path after the registry host."""
+    parts = reference.split("/", 1)
+    if len(parts) == 1 or not image_registry(reference):
+        return ""
+    return parts[1].split("@", 1)[0].rsplit(":", 1)[0]
+
+
 if event != "push":
     tag = os.environ.get("INPUT_TAG", "").strip() or "latest"
 else:
@@ -49,15 +68,13 @@ base_amd64 = value("BASE_IMAGE_AMD64", None, "VAR_BASE_IMAGE_AMD64")
 base_arm64 = value("BASE_IMAGE_ARM64", None, "VAR_BASE_IMAGE_ARM64")
 target_amd64 = value("TARGET_IMAGE_AMD64", "INPUT_TARGET_IMAGE_AMD64", "VAR_TARGET_IMAGE_AMD64")
 target_arm64 = value("TARGET_IMAGE_ARM64", "INPUT_TARGET_IMAGE_ARM64", "VAR_TARGET_IMAGE_ARM64")
-aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY")
+aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY").rstrip("/")
 aliyun_amd64 = value("ALIYUN_IMAGE_AMD64", "INPUT_ALIYUN_IMAGE_AMD64", "VAR_ALIYUN_IMAGE_AMD64")
 aliyun_arm64 = value("ALIYUN_IMAGE_ARM64", "INPUT_ALIYUN_IMAGE_ARM64", "VAR_ALIYUN_IMAGE_ARM64")
 aliyun_amd64 = aliyun_amd64 or target_amd64
 aliyun_arm64 = aliyun_arm64 or target_arm64
 dockerfile = config.get("DOCKERFILE", "Dockerfile").strip()
 build_context = config.get("BUILD_CONTEXT", ".").strip()
-alpine_mirror = config.get("ALPINE_MIRROR", "https://mirrors.aliyun.com/alpine").strip()
-alpine_version = config.get("ALPINE_VERSION", "3.23").strip()
 architecture_selection = os.environ.get("WORKFLOW_ARCHITECTURES", "").strip() or config.get("ARCHITECTURES", "all").strip()
 architectures = {
     "amd64": ["amd64"],
@@ -96,7 +113,18 @@ aliyun_missing.extend(
         ("arm64", "ALIYUN_IMAGE_ARM64", aliyun_arm64),
     ) if architecture in selected and not item
 )
-aliyun_configured = not aliyun_missing and primary
+aliyun_name_issues = []
+for architecture, name, item in (
+    ("amd64", "ALIYUN_IMAGE_AMD64", aliyun_amd64),
+    ("arm64", "ALIYUN_IMAGE_ARM64", aliyun_arm64),
+):
+    if architecture not in selected or not item or not aliyun_registry:
+        continue
+    if image_registry(item) != aliyun_registry:
+        aliyun_name_issues.append(f"{name} registry must be {aliyun_registry}")
+    elif len(image_repository(item).split("/")) < 2:
+        aliyun_name_issues.append(f"{name} must include namespace/repository")
+aliyun_configured = not aliyun_missing and not aliyun_name_issues and primary
 base = all(item for architecture, item in (("amd64", base_amd64), ("arm64", base_arm64)) if architecture in selected)
 build_configuration_ready = primary and base and bool(architectures) and tag_valid
 valid_operations = ("auto", "build-release", "pull-release", "build-push-release")
@@ -142,6 +170,8 @@ if not primary:
     reasons.append("Build skipped; missing primary image names: " + ", ".join(primary_missing))
 if duplicate_primary_names:
     reasons.append("Build skipped; selected architecture image names must be different.")
+if aliyun_name_issues:
+    reasons.append("Aliyun image naming is invalid: " + "; ".join(aliyun_name_issues) + ".")
 if not architectures:
     reasons.append("Build skipped; architectures must be amd64, arm64 or all.")
 if not base:
@@ -190,7 +220,6 @@ outputs = {
     "aliyun_push_enabled": str(can_push_aliyun).lower(), "aliyun_pull_enabled": str(can_pull_aliyun).lower(),
     "release_enabled": str(release_enabled).lower(), "hap_enabled": str(hap_enabled).lower(),
     "dockerfile": dockerfile, "build_context": build_context,
-    "alpine_mirror": alpine_mirror, "alpine_version": alpine_version,
     "can_primary": str(primary).lower(), "can_aliyun": str(can_push_aliyun).lower(),
     "can_build": str(can_build).lower(), "can_package": str(can_package).lower(),
     "can_release": str(can_release).lower(),
