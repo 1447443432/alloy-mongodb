@@ -91,8 +91,8 @@ loki.write "victorialogs" {
     url = sys.env("VICTORIALOGS_PUSH_URL")
 
     basic_auth {
-      username = sys.env("VICTORIALOGS_USERNAME")
-      password = sys.env("VICTORIALOGS_PASSWORD")
+      username = sys.env("MONITOR_AUTH_USERNAME")
+      password = sys.env("MONITOR_AUTH_PASSWORD")
     }
   }
 }

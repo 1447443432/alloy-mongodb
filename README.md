@@ -88,7 +88,7 @@ MONITOR_AUTH_PASSWORD: mypassword
 
 如果不填写 `MONGODB_SERVER_IP` 或 `MONGODB_INSTANCE_ID`，Compose 会只读挂载宿主机 `/etc/machine-id`，自动生成类似 `mongodb-a1b2c3d4e5f6` 的名称。虚拟机或服务器克隆后，请确认 machine-id 已重新生成。
 
-所有支持变量都在 `docker-compose.yaml` 中以变量形式声明，并在本 README 中说明。通常修改 `config/alloy.env` 后使用 `--env-file` 启动即可；宿主机环境变量可以临时覆盖其中任意变量。旧部署仍可传入 `VICTORIALOGS_USERNAME` 和 `VICTORIALOGS_PASSWORD`，但新部署统一使用 `MONITOR_AUTH_USERNAME` 和 `MONITOR_AUTH_PASSWORD`；当两组同时存在时，`MONITOR_AUTH_*` 优先。
+所有支持变量都在 `docker-compose.yaml` 中以变量形式声明，并在本 README 中说明。通常修改 `config/alloy.env` 后使用 `--env-file` 启动即可；宿主机环境变量可以临时覆盖其中任意变量。认证只使用 `MONITOR_AUTH_USERNAME` 和 `MONITOR_AUTH_PASSWORD`，与 `monitor-victorialogs-grafana` 保持一致。
 
 慢查询的 `durationMillis`、`ns`、`planSummary`、`docsExamined`、`reslen` 和 `attr` 保留在日志 JSON 中，不作为 Loki labels，避免高基数字段造成流数量和索引开销增长。
 
