@@ -314,13 +314,13 @@ jobs:
           workflow_file="${workflow_file%@*}"
           endpoint="repos/${REPOSITORY}/actions/workflows/${workflow_file}/runs?status=completed&per_page=100"
 
-          echo "[INFO] finding successful runs for ${workflow_file}..."
+          echo "[INFO] finding completed runs for ${workflow_file}..."
           # The current run is still in progress while this cleanup job runs,
           # so it is not returned by status=completed. Keep it explicitly and
-          # delete every other successful run returned by the API.
-          successful_runs="$(gh api --paginate "${endpoint}" | jq -s -r --arg current_run_id "${CURRENT_RUN_ID}" '
+          # delete every other completed run, including failed runs.
+          completed_runs="$(gh api --paginate "${endpoint}" | jq -s -r --arg current_run_id "${CURRENT_RUN_ID}" '
             [.[].workflow_runs[]
-              | select(.status == "completed" and .conclusion == "success")
+              | select(.status == "completed")
               | select((.id | tostring) != $current_run_id)
             ]
             | .[]
@@ -328,15 +328,15 @@ jobs:
             | @tsv
           ')"
 
-          if [[ -z "${successful_runs}" ]]; then
-            echo "[OK] no older successful runs to delete"
+          if [[ -z "${completed_runs}" ]]; then
+            echo "[OK] no older completed runs to delete"
             exit 0
           fi
 
           while IFS=$'\t' read -r run_id run_number created_at; do
             [[ -z "${run_id}" ]] && continue
-            echo "[INFO] deleting successful run #${run_number} (${run_id}, ${created_at})"
+            echo "[INFO] deleting completed run #${run_number} (${run_id}, ${created_at})"
             gh api --method DELETE "repos/${REPOSITORY}/actions/runs/${run_id}"
-          done <<< "${successful_runs}"
+          done <<< "${completed_runs}"
 
-          echo "[OK] kept the latest successful workflow run"
+          echo "[OK] kept the current successful workflow run"
