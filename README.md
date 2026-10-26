@@ -100,6 +100,8 @@ VICTORIALOGS_IP=10.206.0.5 docker compose --env-file ./config/alloy.env up -d
 
 不依赖 Python，使用 Bash、`date` 和 `cat`：
 
+每条日志都会随机生成一个 `ws` 加 24 位十六进制字符的表名。
+
 ```bash
 sudo bash <<'BASH'
 set -eu
@@ -108,20 +110,13 @@ LOG_FILE=/data/logs/mongodb/mongodb.log
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
 
-TABLE_IDS=(
-  ws_demo_670c8e8e167acea9dcf58855
-  ws_demo_670c8e8e167acea9dcf58856
-  ws_demo_670c8e8e167acea9dcf58857
-  ws_demo_670c8e8e167acea9dcf58858
-  ws_demo_670c8e8e167acea9dcf58859
-)
 DURATIONS=(1250 2387 43146 1680 9021)
 
-for i in "${!TABLE_IDS[@]}"; do
+for i in "${!DURATIONS[@]}"; do
   now="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
   epoch="$(date +%s)"
   uuid="$(cat /proc/sys/kernel/random/uuid)"
-  table_id="${TABLE_IDS[$i]}"
+  table_id="ws$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"
   duration="${DURATIONS[$i]}"
 
   cat >> "$LOG_FILE" <<EOF
@@ -129,33 +124,30 @@ for i in "${!TABLE_IDS[@]}"; do
 EOF
 done
 
-echo "已写入 ${#TABLE_IDS[@]} 条测试慢查询日志：$LOG_FILE"
+echo "已写入 ${#DURATIONS[@]} 条测试慢查询日志：$LOG_FILE"
 BASH
 ```
 
 #### Python 版
 
+Python 版本同样会为每条日志随机生成表名。
+
 ```bash
 sudo python3 - <<'PY'
 import json
 import os
+import secrets
 import uuid
 from datetime import datetime, timezone
 
 path = "/data/logs/mongodb/mongodb.log"
 os.makedirs(os.path.dirname(path), exist_ok=True)
 
-tables = [
-    "ws_demo_670c8e8e167acea9dcf58855",
-    "ws_demo_670c8e8e167acea9dcf58856",
-    "ws_demo_670c8e8e167acea9dcf58857",
-    "ws_demo_670c8e8e167acea9dcf58858",
-    "ws_demo_670c8e8e167acea9dcf58859",
-]
 durations = [1250, 2387, 43146, 1680, 9021]
 
 with open(path, "a", encoding="utf-8") as stream:
-    for index, (table, duration) in enumerate(zip(tables, durations), 1):
+    for index, duration in enumerate(durations, 1):
+        table = "ws" + secrets.token_hex(12)
         now = datetime.now(timezone.utc)
         epoch = int(now.timestamp())
         log = {
@@ -199,7 +191,7 @@ with open(path, "a", encoding="utf-8") as stream:
         stream.write(json.dumps(log, separators=(",", ":")) + "\n")
         stream.flush()
 
-print(f"已写入 {len(tables)} 条测试慢查询日志：{path}")
+print(f"已写入 {len(durations)} 条测试慢查询日志：{path}")
 PY
 ```
 
