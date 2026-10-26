@@ -3,8 +3,6 @@ name: Image Make
 on:
   push:
     branches: [master]
-    paths-ignore:
-      - agents/**
   workflow_dispatch:
     inputs:
       operation:

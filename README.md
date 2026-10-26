@@ -120,7 +120,7 @@ amd64 和 arm64 使用各自的原生 Runner 分别构建，不使用 QEMU 模�
 - `pull-release`：使用已有阿里云镜像发布。
 - `build-push-release`：构建、推送阿里云并发布。
 
-这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，默认 `PUSH_OPERATION=auto`，Workflow 会按 `.image-build.env` 和 Repository Variables 自动选择：阿里云 Push 配置完整时执行 `build-push-release`，未配置或配置不完整时自动执行 `build-release`；如果指定了具体 `PUSH_OPERATION`，则严格按指定模式执行。仅修改 `agents/` 时不会触发。
+这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，默认 `PUSH_OPERATION=auto`，Workflow 会按 `.image-build.env` 和 Repository Variables 自动选择：阿里云 Push 配置完整时执行 `build-push-release`，未配置或配置不完整时自动执行 `build-release`；如果指定了具体 `PUSH_OPERATION`，则严格按指定模式执行。
 
 Git push 的模式可以通过 `PUSH_OPERATION` 配置，默认值为 `auto`。可选值为 `auto`、`build-release`、`pull-release`、`build-push-release`；配置为具体模式后，push 会严格按指定模式执行。该配置可写在 `.image-build.env`，也可用同名 Repository Variable 覆盖；手动 `Run workflow` 使用页面中的 `operation`，不受 `PUSH_OPERATION` 影响。
 
@@ -222,8 +222,6 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 `.image-build.env` 是项目级默认配置。它使用简单的 `KEY=VALUE` 格式，支持 `#` 注释，适合直接复制到其他项目后修改。
 
 `.github/workflows/image-make.yml` 和 `.github/image-make/` 不保存本项目的镜像仓库；项目个性化值集中在 `.image-build.env`，因此这套 Workflow 可以直接复制到其他项目使用。
-
-仅修改 `agents/` 下的 Skill 不会触发镜像构建；需要验证 Skill 时请手动运行 Workflow。
 
 配置覆盖顺序从高到低为：
 

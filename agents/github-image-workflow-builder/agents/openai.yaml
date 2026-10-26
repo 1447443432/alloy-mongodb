@@ -1,4 +1,0 @@
-interface:
-  display_name: "GitHub Image Workflow Builder"
-  short_description: "严谨创建和修复多架构 GitHub 镜像 Workflow"
-  default_prompt: "请使用此 Skill 严谨创建或修复项目的 GitHub 多架构镜像构建 Workflow。"
