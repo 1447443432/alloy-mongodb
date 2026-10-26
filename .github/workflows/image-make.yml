@@ -314,7 +314,7 @@ jobs:
           endpoint="repos/${REPOSITORY}/actions/workflows/${workflow_file}/runs?status=completed&per_page=100"
 
           echo "[INFO] finding successful runs for ${workflow_file}..."
-          successful_runs="$(gh api --paginate --slurp "${endpoint}" --jq '
+          successful_runs="$(gh api --paginate --slurp "${endpoint}" | jq -r '
             [.[].workflow_runs[]
               | select(.status == "completed" and .conclusion == "success")
             ]
