@@ -40,7 +40,7 @@ VICTORIALOGS_IP=10.206.0.5 MONGODB_SERVER_IP=10.206.0.8 \
 docker compose --env-file ./config/alloy.env up -d
 ```
 
-`docker-compose.yaml` 默认将 VictoriaLogs 地址设置为同一 Compose 网络中的服务名 `hap-monitor-logs`：
+Alloy 启动脚本默认将 VictoriaLogs 地址设置为同一 Compose 网络中的服务名 `hap-monitor-logs`。Compose 只透传外部传入的 `VICTORIALOGS_IP`，不在 YAML 中写默认值：
 
 ```yaml
 VICTORIALOGS_IP: hap-monitor-logs
@@ -75,7 +75,7 @@ VICTORIALOGS_IP=10.206.0.5 docker compose --env-file ./config/alloy.env up -d
 
 | 变量 | 示例 | 说明 |
 |---|---|---|
-| `VICTORIALOGS_IP` | `hap-monitor-logs` | VictoriaLogs 地址；同一 Compose 默认使用服务名，独立部署时必须改为实际 IP/DNS |
+| `VICTORIALOGS_IP` | `hap-monitor-logs`（entrypoint 默认） | VictoriaLogs 地址；同一 Compose 使用服务名，独立部署时通过环境变量或 `config/alloy.env` 改为实际 IP/DNS |
 | `MONITOR_AUTH_USERNAME` | `myuser` | 与 monitor-victorialogs-grafana 共用的 VictoriaLogs Basic Auth 用户名 |
 | `MONITOR_AUTH_PASSWORD` | `请修改为真实密码` | 与 monitor-victorialogs-grafana 共用的 VictoriaLogs Basic Auth 密码 |
 | `MONGODB_LOG_PATH` | `/data/logs/mongodb/mongodb.log` | 容器内日志路径，必须与 Compose 挂载目标一致 |

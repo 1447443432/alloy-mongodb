@@ -8,16 +8,12 @@ echo "==========================================================================
 ALLOY_HOME="/usr/local/alloy-vlogs"
 ALLOY_BIN="${ALLOY_HOME}/bin/alloy"
 
-: "${VICTORIALOGS_IP:=}"
+: "${VICTORIALOGS_IP:=hap-monitor-logs}"
 : "${VICTORIALOGS_PORT:=9428}"
 : "${MONITOR_AUTH_USERNAME:=}"
 : "${MONITOR_AUTH_PASSWORD:=}"
 : "${MONGODB_LOG_PATH:=/data/logs/mongodb/mongodb.log}"
 
-if [ -z "${VICTORIALOGS_IP}" ]; then
-  echo ">>> ERROR: VICTORIALOGS_IP is required" >&2
-  exit 1
-fi
 if [ -z "${MONITOR_AUTH_USERNAME}" ]; then
   echo ">>> ERROR: MONITOR_AUTH_USERNAME is required" >&2
   exit 1

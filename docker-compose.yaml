@@ -4,8 +4,8 @@ services:
     container_name: alloy-vlogs-mongodb
     restart: always
     environment:
-      # 默认使用同一 Compose 中的 VictoriaLogs 服务名；独立部署时覆盖为实际 IP/DNS
-      VICTORIALOGS_IP: "${VICTORIALOGS_IP:-hap-monitor-logs}"
+      # 可选：从宿主机环境或 --env-file 传入；未传入时由 entrypoint 使用 hap-monitor-logs
+      - VICTORIALOGS_IP
       # 与 hap-monitor-logs 共用 VictoriaLogs Basic Auth，需与其保持一致
       MONITOR_AUTH_USERNAME: myuser
       MONITOR_AUTH_PASSWORD: mypassword
