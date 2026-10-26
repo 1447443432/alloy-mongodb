@@ -40,7 +40,7 @@ VICTORIALOGS_IP=10.206.0.5 MONGODB_SERVER_IP=10.206.0.8 \
 docker compose --env-file ./config/alloy.env up -d
 ```
 
-如果 Alloy 与 `monitor-victorialogs-grafana` 写在同一个 Compose 文件中，VictoriaLogs 地址可以直接使用服务名：
+`docker-compose.yaml` 默认将 VictoriaLogs 地址设置为同一 Compose 网络中的服务名 `hap-monitor-logs`：
 
 ```yaml
 VICTORIALOGS_IP: hap-monitor-logs
@@ -49,7 +49,13 @@ MONITOR_AUTH_USERNAME: myuser
 MONITOR_AUTH_PASSWORD: mypassword
 ```
 
-此时两个服务必须位于同一个 Compose 网络中。单独部署 Alloy 时，`VICTORIALOGS_IP` 可以继续填写 VictoriaLogs 所在主机的 IP 或可解析主机名。虽然变量名保留为 `VICTORIALOGS_IP` 以兼容旧部署，但实际支持 IP、DNS 名称和 Compose 服务名。
+此默认值要求 Alloy 与 `monitor-victorialogs-grafana` 位于同一个 Compose 网络中。单独部署 Alloy 时，必须通过宿主机环境变量或 `config/alloy.env` 覆盖为 VictoriaLogs 所在主机的 IP 或可解析主机名。例如：
+
+```bash
+VICTORIALOGS_IP=10.206.0.5 docker compose --env-file ./config/alloy.env up -d
+```
+
+虽然变量名保留为 `VICTORIALOGS_IP`，但实际支持 IP、DNS 名称和 Compose 服务名。
 
 `MONGODB_HOSTNAME` 默认从宿主机 `/etc/hostname` 自动获取，仅用于展示，不作为唯一标识。`MONGODB_JOB_NAME` 的生成优先级为：手工指定的 `MONGODB_JOB_NAME`，其次是 `mongodb-<MONGODB_SERVER_IP>`，再其次是 `mongodb-<MONGODB_INSTANCE_ID>`，最后使用宿主机 `/etc/machine-id` 前 12 位自动生成。如果这些标识都不可用，Alloy 会拒绝启动，避免产生重复来源标识。现场参数统一修改 `config/alloy.env` 中的 `VICTORIALOGS_IP`、`VICTORIALOGS_PORT`、`MONITOR_AUTH_USERNAME`、`MONITOR_AUTH_PASSWORD`、`MONGODB_SERVER_IP` 和 `MONGODB_LOG_PATH`；`VICTORIALOGS_PUSH_URL` 会由最终生效的地址和端口拼接生成。生产环境建议改用 Docker Secrets 或外部密钥管理，避免将密码直接写入镜像或配置文件。
 
@@ -69,7 +75,7 @@ MONITOR_AUTH_PASSWORD: mypassword
 
 | 变量 | 示例 | 说明 |
 |---|---|---|
-| `VICTORIALOGS_IP` | `172.17.30.241` | VictoriaLogs 服务 IP |
+| `VICTORIALOGS_IP` | `hap-monitor-logs` | VictoriaLogs 地址；同一 Compose 默认使用服务名，独立部署时必须改为实际 IP/DNS |
 | `MONITOR_AUTH_USERNAME` | `myuser` | 与 monitor-victorialogs-grafana 共用的 VictoriaLogs Basic Auth 用户名 |
 | `MONITOR_AUTH_PASSWORD` | `请修改为真实密码` | 与 monitor-victorialogs-grafana 共用的 VictoriaLogs Basic Auth 密码 |
 | `MONGODB_LOG_PATH` | `/data/logs/mongodb/mongodb.log` | 容器内日志路径，必须与 Compose 挂载目标一致 |
