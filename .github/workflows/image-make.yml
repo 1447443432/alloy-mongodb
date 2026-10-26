@@ -306,6 +306,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           WORKFLOW_REF: ${{ github.workflow_ref }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
 
@@ -314,13 +315,14 @@ jobs:
           endpoint="repos/${REPOSITORY}/actions/workflows/${workflow_file}/runs?status=completed&per_page=100"
 
           echo "[INFO] finding successful runs for ${workflow_file}..."
-          successful_runs="$(gh api --paginate --slurp "${endpoint}" | jq -r '
+          # The current run is still in progress while this cleanup job runs,
+          # so it is not returned by status=completed. Keep it explicitly and
+          # delete every other successful run returned by the API.
+          successful_runs="$(gh api --paginate "${endpoint}" | jq -s -r --arg current_run_id "${CURRENT_RUN_ID}" '
             [.[].workflow_runs[]
               | select(.status == "completed" and .conclusion == "success")
+              | select((.id | tostring) != $current_run_id)
             ]
-            | sort_by(.created_at)
-            | reverse
-            | .[1:]
             | .[]
             | [.id, .run_number, .created_at]
             | @tsv
