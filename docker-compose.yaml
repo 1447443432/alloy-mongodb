@@ -4,14 +4,14 @@ services:
     container_name: alloy-vlogs-mongodb
     restart: always
     environment:
-      # VictoriaLogs 地址；同一 Compose 使用 hap-monitor-logs
+      # VictoriaLogs 地址
       VICTORIALOGS_IP: 10.206.0.5
-      # 与 hap-monitor-logs 共用认证
-      MONITOR_AUTH_USERNAME: myuser
-      MONITOR_AUTH_PASSWORD: mypassword
       # VictoriaLogs 端口
       VICTORIALOGS_PORT: 9428
-      # MongoDB 服务器 IP；用于生成唯一任务名
+      # 使用 VictoriaLogs 认证信息
+      MONITOR_AUTH_USERNAME: myuser
+      MONITOR_AUTH_PASSWORD: mypassword
+      # MongoDB 所在服务器 IP，用于生成 mongodb-<IP> 唯一标识
       MONGODB_SERVER_IP: 10.206.0.8
     volumes:
       - /data/logs/mongodb/mongodb.log:/data/logs/mongodb/mongodb.log:ro
