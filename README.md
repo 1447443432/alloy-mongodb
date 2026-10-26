@@ -40,7 +40,7 @@ VICTORIALOGS_IP=10.206.0.5 MONGODB_SERVER_IP=10.206.0.8 \
 docker compose --env-file ./config/alloy.env up -d
 ```
 
-Alloy 启动脚本默认将 VictoriaLogs 地址设置为同一 Compose 网络中的服务名 `hap-monitor-logs`。Compose 中的 `VICTORIALOGS_IP` 保持为空，优先读取宿主机环境或 `--env-file`；没有传入值时由 entrypoint 使用默认值：
+Alloy 启动脚本默认将 VictoriaLogs 地址设置为同一 Compose 网络中的服务名 `hap-monitor-logs`。Compose 中保留 `10.206.0.5` 作为独立部署的可编辑示例；同一 Compose 可改为 `hap-monitor-logs`，删除该变量或留空时由 entrypoint 使用默认值：
 
 ```yaml
 VICTORIALOGS_IP: hap-monitor-logs
