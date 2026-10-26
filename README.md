@@ -92,6 +92,123 @@ VICTORIALOGS_IP=10.206.0.5 docker compose --env-file ./config/alloy.env up -d
 | `/etc/machine-id` | 自动读取前 12 位 | IP 和指定标识都为空时生成稳定标识 |
 | `MONGODB_HOSTNAME` | 自动读取宿主机 hostname | 仅用于展示，不作为唯一标识 |
 
+### 生成测试慢查询日志
+
+以下命令仅用于测试采集链路，会向 `/data/logs/mongodb/mongodb.log` 追加 5 条耗时大于 1000ms 的 MongoDB 慢查询日志。日志中的表 ID、数据库名、UUID 和签名均为脱敏示例；每条日志写入时使用当前 UTC 时间。
+
+#### Linux 基础命令版
+
+不依赖 Python，使用 Bash、`date` 和 `cat`：
+
+```bash
+sudo bash <<'BASH'
+set -eu
+
+LOG_FILE=/data/logs/mongodb/mongodb.log
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+
+TABLE_IDS=(
+  ws_demo_670c8e8e167acea9dcf58855
+  ws_demo_670c8e8e167acea9dcf58856
+  ws_demo_670c8e8e167acea9dcf58857
+  ws_demo_670c8e8e167acea9dcf58858
+  ws_demo_670c8e8e167acea9dcf58859
+)
+DURATIONS=(1250 2387 43146 1680 9021)
+
+for i in "${!TABLE_IDS[@]}"; do
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+  epoch="$(date +%s)"
+  uuid="$(cat /proc/sys/kernel/random/uuid)"
+  table_id="${TABLE_IDS[$i]}"
+  duration="${DURATIONS[$i]}"
+
+  cat >> "$LOG_FILE" <<EOF
+{"t":{"\$date":"$now"},"s":"I","c":"COMMAND","id":51803,"ctx":"conn$((100+i+1))","msg":"Slow query","attr":{"command":{"\$clusterTime":{"clusterTime":{"\$timestamp":{"i":$((i+1)),"t":$epoch}},"signature":{"hash":{"\$binary":{"base64":"REDACTED","subType":"0"}},"keyId":1}},"\$db":"example_db","find":"$table_id","filter":{"status":1,"sys_lock":{"\$ne":true}},"limit":2000,"lsid":{"id":{"\$uuid":"$uuid"}},"sort":{"utime":-1}},"cursorExhausted":true,"docsExamined":1010000,"durationMillis":$duration,"keysExamined":1010000,"nreturned":0,"ns":"example_db.$table_id","numYields":4095,"planCacheKey":"demo$i","planSummary":"IXSCAN { utime: 1 }","protocol":"op_msg","queryHash":"demo_hash_$i","reslen":249,"type":"command"}}
+EOF
+done
+
+echo "已写入 ${#TABLE_IDS[@]} 条测试慢查询日志：$LOG_FILE"
+BASH
+```
+
+#### Python 版
+
+```bash
+sudo python3 - <<'PY'
+import json
+import os
+import uuid
+from datetime import datetime, timezone
+
+path = "/data/logs/mongodb/mongodb.log"
+os.makedirs(os.path.dirname(path), exist_ok=True)
+
+tables = [
+    "ws_demo_670c8e8e167acea9dcf58855",
+    "ws_demo_670c8e8e167acea9dcf58856",
+    "ws_demo_670c8e8e167acea9dcf58857",
+    "ws_demo_670c8e8e167acea9dcf58858",
+    "ws_demo_670c8e8e167acea9dcf58859",
+]
+durations = [1250, 2387, 43146, 1680, 9021]
+
+with open(path, "a", encoding="utf-8") as stream:
+    for index, (table, duration) in enumerate(zip(tables, durations), 1):
+        now = datetime.now(timezone.utc)
+        epoch = int(now.timestamp())
+        log = {
+            "t": {"$date": now.isoformat(timespec="milliseconds").replace("+00:00", "Z")},
+            "s": "I",
+            "c": "COMMAND",
+            "id": 51803,
+            "ctx": f"conn{100 + index}",
+            "msg": "Slow query",
+            "attr": {
+                "command": {
+                    "$clusterTime": {
+                        "clusterTime": {"$timestamp": {"i": index, "t": epoch}},
+                        "signature": {
+                            "hash": {"$binary": {"base64": "REDACTED", "subType": "0"}},
+                            "keyId": 1,
+                        },
+                    },
+                    "$db": "example_db",
+                    "find": table,
+                    "filter": {"status": 1, "sys_lock": {"$ne": True}},
+                    "limit": 2000,
+                    "lsid": {"id": {"$uuid": str(uuid.uuid4())}},
+                    "sort": {"utime": -1},
+                },
+                "cursorExhausted": True,
+                "docsExamined": 1010000,
+                "durationMillis": duration,
+                "keysExamined": 1010000,
+                "nreturned": 0,
+                "ns": f"example_db.{table}",
+                "numYields": 4095,
+                "planCacheKey": f"demo{index}",
+                "planSummary": "IXSCAN { utime: 1 }",
+                "protocol": "op_msg",
+                "queryHash": f"demo_hash_{index}",
+                "reslen": 249,
+                "type": "command",
+            },
+        }
+        stream.write(json.dumps(log, separators=(",", ":")) + "\n")
+        stream.flush()
+
+print(f"已写入 {len(tables)} 条测试慢查询日志：{path}")
+PY
+```
+
+验证结果：
+
+```bash
+tail -n 5 /data/logs/mongodb/mongodb.log | jq -r '[.t["$date"], .attr.ns, .attr.durationMillis] | @tsv'
+```
+
 如果不填写 `MONGODB_SERVER_IP` 或 `MONGODB_INSTANCE_ID`，Compose 会只读挂载宿主机 `/etc/machine-id`，自动生成类似 `mongodb-a1b2c3d4e5f6` 的名称。虚拟机或服务器克隆后，请确认 machine-id 已重新生成。
 
 所有支持变量都在 `docker-compose.yaml` 中以变量形式声明，并在本 README 中说明。通常修改 `config/alloy.env` 后使用 `--env-file` 启动即可；宿主机环境变量可以临时覆盖其中任意变量。认证只使用 `MONITOR_AUTH_USERNAME` 和 `MONITOR_AUTH_PASSWORD`，与 `monitor-victorialogs-grafana` 保持一致。

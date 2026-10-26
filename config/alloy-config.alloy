@@ -6,10 +6,10 @@ logging {
 local.file_match "mongodb" {
   path_targets = [
     {
-      __path__ = sys.env("MONGODB_LOG_PATH")
-      job      = sys.env("MONGODB_JOB_NAME")
-      host     = sys.env("MONGODB_HOSTNAME")
-      instance = sys.env("MONGODB_HOSTNAME")
+      __path__ = sys.env("MONGODB_LOG_PATH"),
+      job      = sys.env("MONGODB_JOB_NAME"),
+      host     = sys.env("MONGODB_HOSTNAME"),
+      instance = sys.env("MONGODB_HOSTNAME"),
     },
   ]
 }
@@ -23,10 +23,16 @@ loki.process "mongodb" {
   // Parse MongoDB JSON logs and use the embedded timestamp.
   stage.json {
     expressions = {
-      ts   = "t.\"$date\""
-      c    = "c"
-      msg  = "msg"
-      attr = "attr"
+      ts             = "t.\"$date\"",
+      severity       = "s",
+      c              = "c",
+      msg            = "msg",
+      attr           = "attr",
+      durationMillis = "attr.durationMillis",
+      ns             = "attr.ns",
+      planSummary    = "attr.planSummary",
+      docsExamined   = "attr.docsExamined",
+      reslen         = "attr.reslen",
     }
     drop_malformed = true
   }
@@ -39,48 +45,73 @@ loki.process "mongodb" {
   // Keep only MongoDB slow-query records.
   stage.labels {
     values = {
-      c   = ""
-      msg = ""
+      c   = "",
+      msg = "",
     }
   }
 
   stage.match {
-    selector = "{c!=\"COMMAND\"}"
-    action   = "drop"
+    selector            = "{c!=\"COMMAND\"}"
+    action              = "drop"
+    drop_counter_reason = "not_command"
   }
 
   stage.match {
-    selector = "{msg!=\"Slow query\"}"
-    action   = "drop"
+    selector            = "{msg!=\"Slow query\"}"
+    action              = "drop"
+    drop_counter_reason = "not_slow_query"
   }
 
-  // Keep query details in the log JSON. Do not promote them to labels:
-  // duration, namespace, plan and attr are high-cardinality fields.
-  stage.json {
-    source = "attr"
-    expressions = {
-      durationMillis = "durationMillis"
-      ns             = "ns"
-      planSummary    = "planSummary"
-      docsExamined   = "docsExamined"
-      reslen         = "reslen"
+  stage.label_drop {
+    values = [
+      "c",
+      "msg",
+    ]
+  }
+
+  stage.template {
+    source = "level"
+
+    template = `{{ if eq .severity "I" }}info{{ else if eq .severity "W" }}warn{{ else if eq .severity "E" }}error{{ else if eq .severity "F" }}critical{{ else if eq .severity "D" }}debug{{ else }}info{{ end }}`
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+
+  stage.structured_metadata {
+    values = {
+      durationMillis = "",
+      ns             = "",
+      planSummary    = "",
+      docsExamined   = "",
+      reslen         = "",
     }
   }
 
   stage.template {
-    source = "line"
-    template = `- {
-  "ns": "{{ .ns }}",
-  "durationMillis": "{{ .durationMillis }}",
-  "planSummary": "{{ .planSummary }}",
-  "docsExamined": "{{ .docsExamined }}",
-  "reslen": "{{ .reslen }}",
-  "attr": "{{ .attr }}"
+    source = "display_msg"
+
+    template = `{
+  "ns": {{ toJson .ns }},
+  "durationMillis": {{ toJson (printf "%v" .durationMillis) }},
+  "planSummary": {{ toJson .planSummary }},
+  "docsExamined": {{ toJson (printf "%v" .docsExamined) }},
+  "reslen": {{ toJson (printf "%v" .reslen) }},
+  "attr": {{ toJson (fromJson .attr) }}
 }`
   }
 
+  stage.template {
+    source = "vl_line"
+
+    template = `{"_msg":{{ toJson .display_msg }},"ns":{{ toJson .ns }},"durationMillis":{{ toJson (printf "%v" .durationMillis) }},"planSummary":{{ toJson .planSummary }},"docsExamined":{{ toJson (printf "%v" .docsExamined) }},"reslen":{{ toJson (printf "%v" .reslen) }},"attr":{{ toJson (fromJson .attr) }}}`
+  }
+
   stage.output {
-    source = "line"
+    source = "vl_line"
   }
 
   forward_to = [loki.write.victorialogs.receiver]
